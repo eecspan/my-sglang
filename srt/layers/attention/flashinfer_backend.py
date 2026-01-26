@@ -698,6 +698,7 @@ class FlashInferAttnBackend(AttentionBackend):
         forward_batch: ForwardBatch,
         save_kv_cache=True,
     ):
+        # 在这里，增加sglang中输出kv_scale的逻辑
         # if not hasattr(self, "_kv_scale_debug_printed"):
         #     self._kv_scale_debug_printed = False
         # if not self._kv_scale_debug_printed:
@@ -710,6 +711,7 @@ class FlashInferAttnBackend(AttentionBackend):
             getattr(layer, "v_scale_float", None),
         )
             # self._kv_scale_debug_printed = True
+        # 在这里，增加sglang中输出kv_scale的逻辑
         prefill_wrapper_paged = self.forward_metadata.prefill_wrappers[
             self._get_wrapper_idx(layer)
         ]

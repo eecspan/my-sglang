@@ -1128,6 +1128,7 @@ class ModelRunner:
             logger.error(message)
             return False, message
 
+    # 在这里，增加sglang在更新参数时，防止kv_scale变成0的逻辑
     @torch.no_grad()
     def _refresh_kv_cache_scales(self) -> None:
         """Keep KV cache scales consistent after online weight updates."""
@@ -1147,6 +1148,7 @@ class ModelRunner:
                 continue
             k_scale.copy_(k_scale_float)
             v_scale.copy_(v_scale_float)
+    # 在这里，增加sglang在更新参数时，防止kv_scale变成0的逻辑
 
     def update_weights_from_distributed(self, names, dtypes, shapes, group_name):
         """
@@ -1185,6 +1187,7 @@ class ModelRunner:
                 handle.wait()
 
             self.model.load_weights(weights)
+            # 在这里，增加sglang在更新参数时，防止kv_scale变成0的逻辑
             self._refresh_kv_cache_scales()
             return True, "Succeeded to update parameter online."
 
@@ -1226,6 +1229,7 @@ class ModelRunner:
             self.model.load_weights(named_tensors)
         else:
             raise NotImplementedError(f"Unknown load_format={load_format}")
+        # 在这里，增加sglang在更新参数时，防止kv_scale变成0的逻辑
         self._refresh_kv_cache_scales()
         return True, "Success"
 
@@ -1258,6 +1262,7 @@ class ModelRunner:
 
         # Load the reconstructed tensors using the standard method
         self.model.load_weights(reconstructed_tensors)
+        # 在这里，增加sglang在更新参数时，防止kv_scale变成0的逻辑
         self._refresh_kv_cache_scales()
         return True, "Success"
 

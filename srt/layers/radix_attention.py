@@ -82,6 +82,7 @@ class RadixAttention(nn.Module):
         self.v_scale_float = None
         self.quant_method = None
 
+        # 在这里，增加sglang能够正确读取ckpt中kv_scale的逻辑
         if quant_config is not None:
             print("quant_config is: ", quant_config)
             self.quant_method = quant_config.get_quant_method(self, prefix=prefix)
@@ -95,6 +96,7 @@ class RadixAttention(nn.Module):
             if kv_cache_dtype in ("fp8_e4m3", "fp8_e5m2"):
                 print("set kv cache fp8")
                 self.quant_method = BaseKVCacheMethod(Fp8Config())
+        # 在这里，增加sglang能够正确读取ckpt中kv_scale的逻辑
         if self.quant_method is not None:
             self.quant_method.create_weights(self)
         self.attn_type = attn_type

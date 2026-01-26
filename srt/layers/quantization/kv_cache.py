@@ -53,6 +53,8 @@ class BaseKVCacheMethod(QuantizeMethodBase):
             if is_fp8_fnuz():
                 k_scale *= 2
                 v_scale *= 2
+            # 在这里，增加sglang能够对kv_scale进行修改的逻辑
+            
             # k_scale = 1.0
             # v_scale = 1.0
             # print("k_v scale is: ", k_scale, v_scale)
@@ -61,6 +63,8 @@ class BaseKVCacheMethod(QuantizeMethodBase):
             #     k_scale = 1.0 / k_scale
             #     v_scale = 1.0 / v_scale
             #     print("kv scale invert")
+
+            # 在这里，增加sglang能够对kv_scale进行修改的逻辑
         elif layer.k_scale < 0.0 and layer.v_scale < 0.0:
             # If no scales were loaded (both scales are invalid negative
             # values), use the default value of 1.0
