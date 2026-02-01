@@ -793,13 +793,14 @@ class MHATokenToKVPool(KVCache):
                 cache_k.div_(k_scale)
             if v_scale is not None:
                 cache_v.div_(v_scale)
-            cache_k = cache_k.to(self.dtype)
-            cache_v = cache_v.to(self.dtype)
-
+            
+            # FP8 clamp 必须在 .to() 之前执行，否则超出范围的值会变成 Inf/NaN
             if self.dtype == torch.float8_e4m3fn:
-                print("sglang memory_poll clamp for float8_e4m3fn")
                 cache_k = cache_k.clamp(min=-448.0, max=448.0)
                 cache_v = cache_v.clamp(min=-448.0, max=448.0)
+            
+            cache_k = cache_k.to(self.dtype)
+            cache_v = cache_v.to(self.dtype)
 
         if self.store_dtype != self.dtype:
             cache_k = cache_k.view(self.store_dtype)
@@ -1234,13 +1235,14 @@ class AscendTokenToKVPool(MHATokenToKVPool):
                 cache_k.div_(k_scale)
             if v_scale is not None:
                 cache_v.div_(v_scale)
-            cache_k = cache_k.to(self.dtype)
-            cache_v = cache_v.to(self.dtype)
             
+            # FP8 clamp 必须在 .to() 之前执行，否则超出范围的值会变成 Inf/NaN
             if self.dtype == torch.float8_e4m3fn:
-                print("sglang memory_poll clamp for float8_e4m3fn")
                 cache_k = cache_k.clamp(min=-448.0, max=448.0)
                 cache_v = cache_v.clamp(min=-448.0, max=448.0)
+            
+            cache_k = cache_k.to(self.dtype)
+            cache_v = cache_v.to(self.dtype)
 
         if self.store_dtype != self.dtype:
             cache_k = cache_k.view(self.store_dtype)
@@ -1423,10 +1425,10 @@ class MLATokenToKVPool(KVCache):
                     cache_k
                 )
             else:
-                cache_k = cache_k.to(self.dtype)
+                # FP8 clamp 必须在 .to() 之前执行，否则超出范围的值会变成 Inf/NaN
                 if self.dtype == torch.float8_e4m3fn:
-                    print("sglang memory_poll clamp for float8_e4m3fn")
                     cache_k = cache_k.clamp(min=-448.0, max=448.0)
+                cache_k = cache_k.to(self.dtype)
 
         if self.store_dtype != self.dtype:
             if is_float4_e2m1fn_x2(self.dtype):
@@ -1473,12 +1475,12 @@ class MLATokenToKVPool(KVCache):
                         KVFP4QuantizeUtil.batched_quantize(cache_k_rope)
                     )
                 else:
-                    cache_k_nope = cache_k_nope.to(self.dtype)
-                    cache_k_rope = cache_k_rope.to(self.dtype)
+                    # FP8 clamp 必须在 .to() 之前执行，否则超出范围的值会变成 Inf/NaN
                     if self.dtype == torch.float8_e4m3fn:
-                        print("sglang memory_poll clamp for float8_e4m3fn")
                         cache_k_nope = cache_k_nope.clamp(min=-448.0, max=448.0)
                         cache_k_rope = cache_k_rope.clamp(min=-448.0, max=448.0)
+                    cache_k_nope = cache_k_nope.to(self.dtype)
+                    cache_k_rope = cache_k_rope.to(self.dtype)
 
             if self.store_dtype != self.dtype:
                 cache_k_nope = cache_k_nope.view(self.store_dtype)
@@ -1844,12 +1846,12 @@ class AscendMLAPagedTokenToKVPool(MLATokenToKVPool):
     ):
         layer_id = layer.layer_id
         if cache_k.dtype != self.dtype:
+            # FP8 clamp 必须在 .to() 之前执行，否则超出范围的值会变成 Inf/NaN
+            if self.dtype == torch.float8_e4m3fn:
+                cache_k = cache_k.clamp(min=-448.0, max=448.0)
+                cache_v = cache_v.clamp(min=-448.0, max=448.0)
             cache_k = cache_k.to(self.dtype)
             cache_v = cache_v.to(self.dtype)
-            if self.dtype == torch.float8_e4m3fn:
-                print("sglang memory_poll clamp for float8_e4m3fn")
-                cache_k = cache_v.clamp(min=-448.0, max=448.0)
-                cache_v = cache_v.clamp(min=-448.0, max=448.0)
 
         if self.store_dtype != self.dtype:
             cache_k = cache_k.view(self.store_dtype)
