@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
@@ -21,6 +23,8 @@ if TYPE_CHECKING:
 
 from sgl_kernel import merge_state_v2
 from sgl_kernel.flash_attn import flash_attn_varlen_func, flash_attn_with_kvcache
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -360,6 +364,46 @@ class FlashAttentionBackend(AttentionBackend):
         # See https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/ for more details.
         self.num_splits = (
             1 if model_runner.server_args.enable_deterministic_inference else 0
+        )
+        self._kv_fp8_debug_enabled = os.getenv("SGLANG_KV_FP8_DEBUG", "0") == "1"
+        self._kv_fp8_debug_verbose = (
+            os.getenv("SGLANG_KV_FP8_DEBUG_VERBOSE", "0") == "1"
+        )
+        self._kv_fp8_debug_printed_keys = set()
+
+    def _maybe_log_kv_fp8_debug(
+        self,
+        stage: str,
+        layer: RadixAttention,
+        forward_batch: ForwardBatch,
+        k_descale: Optional[torch.Tensor],
+        v_descale: Optional[torch.Tensor],
+    ) -> None:
+        if not self._kv_fp8_debug_enabled:
+            return
+
+        layer_id = getattr(layer, "layer_id", None)
+        key = (stage, layer_id)
+        if not self._kv_fp8_debug_verbose and key in self._kv_fp8_debug_printed_keys:
+            return
+        self._kv_fp8_debug_printed_keys.add(key)
+
+        logger.info(
+            "[KV_FP8_DEBUG][fa%d][%s] layer_id=%s kv_cache_dtype=%s head_dim=%s "
+            "k_scale=%s v_scale=%s k_scale_float=%s v_scale_float=%s "
+            "k_descale_shape=%s v_descale_shape=%s bs=%s",
+            self.fa_impl_ver,
+            stage,
+            layer_id,
+            self.kv_cache_dtype_str,
+            getattr(layer, "head_dim", None),
+            getattr(layer, "k_scale", None),
+            getattr(layer, "v_scale", None),
+            getattr(layer, "k_scale_float", None),
+            getattr(layer, "v_scale_float", None),
+            getattr(k_descale, "shape", None),
+            getattr(v_descale, "shape", None),
+            getattr(forward_batch, "batch_size", None),
         )
 
     def init_forward_metadata(self, forward_batch: ForwardBatch):
@@ -707,6 +751,7 @@ class FlashAttentionBackend(AttentionBackend):
             q = q.to(self.kv_cache_dtype)
             q_rope = q_rope.to(self.kv_cache_dtype) if q_rope is not None else None
             k_rope = k_rope.to(self.kv_cache_dtype) if k_rope is not None else None
+        self._maybe_log_kv_fp8_debug("extend", layer, forward_batch, k_descale, v_descale)
         causal = True
         if layer.is_cross_attention or layer.attn_type == AttentionType.ENCODER_ONLY:
             causal = False
@@ -1042,6 +1087,7 @@ class FlashAttentionBackend(AttentionBackend):
             q = q.to(self.kv_cache_dtype)
             q_rope = q_rope.to(self.kv_cache_dtype) if q_rope is not None else None
             k_rope = k_rope.to(self.kv_cache_dtype) if k_rope is not None else None
+        self._maybe_log_kv_fp8_debug("decode", layer, forward_batch, k_descale, v_descale)
         if not self.use_mla:
             # Do multi-head attention
 
