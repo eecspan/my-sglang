@@ -90,12 +90,29 @@ class CompressedTensorsMoEMethod(FusedMoEMethodBase):
         quant_config: CompressedTensorsConfig,
         layer: torch.nn.Module,
         prefix: str,
-    ) -> "CompressedTensorsMoEMethod":
+    ) -> "CompressedTensorsMoEMethod | None":
         # TODO: @dsikka: refactor this to use schemes as other kernels
         # are supported + check if the layer is being ignored.
 
-        weight_quant = quant_config.target_scheme_map["Linear"].get("weights")
-        input_quant = quant_config.target_scheme_map["Linear"].get("input_activations")
+        linear_scheme = quant_config.target_scheme_map.get("Linear")
+        if linear_scheme is None:
+            # Common when users only want KV-cache quantization scales (no weight/act quantization).
+            # In that case we should fall back to unquantized MoE weights.
+            logger.warning_once(
+                "CompressedTensors quant_config has no 'Linear' scheme; "
+                "skipping MoE quantization and using unquantized experts."
+            )
+            return None
+
+        weight_quant = linear_scheme.get("weights")
+        input_quant = linear_scheme.get("input_activations")
+        if weight_quant is None:
+            logger.warning_once(
+                "CompressedTensors quant_config has no Linear weight quantization; "
+                "skipping MoE quantization and using unquantized experts."
+            )
+            return None
+
         if quant_config._is_wNa16_group_channel(weight_quant, input_quant):
 
             logger.info_once("Using CompressedTensorsWNA16MarlinMoEMethod")
