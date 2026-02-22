@@ -57,7 +57,10 @@ from sglang.srt.layers.utils import get_layer_id
 from sglang.srt.layers.vocab_parallel_embedding import ParallelLMHead
 from sglang.srt.model_executor.cuda_graph_runner import get_is_capture_mode
 from sglang.srt.model_executor.forward_batch_info import ForwardBatch, PPProxyTensors
-from sglang.srt.model_loader.weight_utils import default_weight_loader
+from sglang.srt.model_loader.weight_utils import (
+    default_weight_loader,
+    maybe_remap_kv_scale_name,
+)
 from sglang.srt.models.qwen2_moe import Qwen2MoeMLP as Qwen3MoeMLP
 from sglang.srt.models.qwen2_moe import Qwen2MoeModel
 from sglang.srt.models.utils import (
@@ -859,6 +862,12 @@ class Qwen3MoeForCausalLM(nn.Module):
 
             if "rotary_emb.inv_freq" in name:
                 continue
+            if "scale" in name:
+                # Remap legacy / alternate kv scale names (e.g. ".self_attn.v_scale")
+                # to RadixAttention expected parameter names (e.g. ".self_attn.attn.v_scale").
+                name = maybe_remap_kv_scale_name(name, params_dict)
+                if name is None:
+                    continue
             for param_name, weight_name, shard_id in stacked_params_mapping:
                 # Skip non-stacked layers and experts (experts handled below).
                 if weight_name not in name:
